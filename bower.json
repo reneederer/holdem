@@ -1,0 +1,25 @@
+{
+  "name": "holdem",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-console": "^1.0.0",
+    "purescript-lists": "^1.0.1",
+    "purescript-quickcheck": "^1.0.0",
+    "purescript-test-unit": "^9.1.0",
+    "purescript-enums": "^1.1.0",
+    "purescript-debug": "^1.0.0",
+    "purescript-maps": "^1.2.0",
+    "purescript-filterable": "^0.1.3",
+    "purescript-control": "^1.0.0",
+    "purescript-random": "^1.0.0",
+    "purescript-psci-support": "^1.0.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^1.0.0"
+  }
+}
