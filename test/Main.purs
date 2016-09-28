@@ -12,10 +12,31 @@ import Data.Maybe
 
 
 main = runTest do
+    suite "Find all Outs" do
+        let communityCards = 
+                [ Card Nine Clubs
+                , Card Five Diamonds
+                , Card Eight Spades
+                ]
+        let heroCards = 
+                [ Card Seven Spades
+                , Card Six Clubs
+                ]
+        let villainCards = 
+                [ Card Nine Hearts
+                , Card Nine Spades
+                ]
+        let deck = fullDeck \\ communityCards \\ heroCards \\ villainCards
+        test "Find the outs" do
+            Assert.equal
+                [ Card Seven Hearts
+                , Card Seven Diamonds
+                ] $ 
+                getOuts deck communityCards heroCards villainCards
     suite "Find best hand out of 7 cards" do
         test "RoyalFlush" do
             Assert.equal
-                (Just $ StraightFlush
+                (StraightFlush
                     [ Card Ace Hearts
                     , Card King Hearts
                     , Card Queen Hearts
@@ -34,7 +55,7 @@ main = runTest do
                     ]
         test "A Straight cannot go round" do
             Assert.equal
-                (Just $ HighCard
+                (HighCard
                     [ Card Ace Hearts
                     , Card King Spades
                     , Card Queen Spades
@@ -54,7 +75,7 @@ main = runTest do
     suite "Recognize 5 cards" do
         test "A Straight cannot go round, it is a HighCard" do
             Assert.equal
-                (Just $ HighCard
+                (HighCard
                     [ Card Ace Hearts
                     , Card King Spades
                     , Card Queen Spades
@@ -71,7 +92,7 @@ main = runTest do
                     ]
         test "High card" do
             Assert.equal
-                (Just $ HighCard
+                (HighCard
                     [ Card Ace Diamonds
                     , Card Jack Clubs
                     , Card Ten Spades
@@ -88,7 +109,7 @@ main = runTest do
                     ]
         test "OnePair is recognized" do
             Assert.equal
-                (Just $ OnePair
+                (OnePair
                     [ Card Seven Clubs
                     , Card Seven Hearts
                     , Card Ace Diamonds
@@ -105,7 +126,7 @@ main = runTest do
                     ]
         test "TwoPair are recognized" do
             Assert.equal
-                (Just $ TwoPair
+                (TwoPair
                     [ Card Jack Clubs
                     , Card Jack Diamonds
                     , Card Seven Clubs
@@ -122,7 +143,7 @@ main = runTest do
                     ]
         test "ThreeOfAKind are recognized" do
             Assert.equal
-                (Just $ ThreeOfAKind
+                (ThreeOfAKind
                     [ Card Jack Clubs
                     , Card Jack Hearts
                     , Card Jack Diamonds
@@ -139,7 +160,7 @@ main = runTest do
                     ]
         test "A Fullhouse is recognized" do
             Assert.equal
-                (Just $ FullHouse
+                (FullHouse
                     [ Card Jack Clubs
                     , Card Jack Spades
                     , Card Jack Diamonds
@@ -156,7 +177,7 @@ main = runTest do
                     ]
         test "Four of a kind are recognized" do
             Assert.equal
-                (Just $ FourOfAKind
+                (FourOfAKind
                     [ Card Jack Clubs
                     , Card Jack Hearts
                     , Card Jack Spades
@@ -173,7 +194,7 @@ main = runTest do
                     ]
         test "A straight does not need to be in order" do
             Assert.equal
-                (Just $ Straight
+                (Straight
                     [ Card Jack Diamonds
                     , Card Ten Spades
                     , Card Nine Hearts
@@ -190,7 +211,7 @@ main = runTest do
                     ]
         test "A straight can go from Ace to Five" do
             Assert.equal
-                (Just $ Straight
+                (Straight
                     [ Card Ace Diamonds
                     , Card Five Hearts
                     , Card Four Clubs
@@ -207,7 +228,7 @@ main = runTest do
                     ]
         test "Flushes are recognized" do
             Assert.equal
-                (Just $ Flush
+                (Flush
                     [ Card King Spades
                     , Card Jack Spades
                     , Card Ten Spades
@@ -224,7 +245,7 @@ main = runTest do
                     ]
         test "StraightFlush is recognized" do
             Assert.equal
-                (Just $ StraightFlush
+                (StraightFlush
                     [ Card Ace Diamonds
                     , Card King Diamonds
                     , Card Queen Diamonds

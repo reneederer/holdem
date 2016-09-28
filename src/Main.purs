@@ -3,6 +3,7 @@ module Main  where
 import Prelude
 import Data.Enum
 import Data.Array
+import Data.String (drop, joinWith)
 import Data.Tuple
 import Data.Map as Map
 import Data.Foldable
@@ -24,7 +25,7 @@ derive instance genericColor :: Generic Color
 instance eqColor :: Eq Color where
     eq = gEq
 instance showColor :: Show Color where
-    show = gShow
+    show x = drop 5 $ gShow x
 
 
 data Face = 
@@ -45,7 +46,7 @@ derive instance genericFace :: Generic Face
 instance eqFace :: Eq Face where
     eq x z = gEq x z
 instance showFace :: Show Face where
-    show x = gShow x
+    show x = drop 5 $ gShow x
 instance ordFace :: Ord Face where
     compare face1 face2 =
         if face1 == face2 then EQ
@@ -115,11 +116,23 @@ data HandValue =
     | TwoPair (Array Card)
     | OnePair (Array Card)
     | HighCard (Array Card)
+    | Unspecified
 derive instance genericHandValue :: Generic HandValue
 instance eqHandValue :: Eq HandValue where
     eq x z = gEq x z
 instance showHandValue :: Show HandValue where
-    show = gShow
+    show x =
+        case x of
+          StraightFlush cards -> "Straight Flush: " <> (joinWith ", " <<< map show) cards
+          FourOfAKind cards -> "Four Of A Kind: " <> (joinWith ", " <<< map show) cards
+          FullHouse cards -> "Full House: " <> (joinWith ", " <<< map show) cards
+          Flush cards -> "Flush: " <> (joinWith ", " <<< map show) cards
+          Straight cards -> "Straight: " <> (joinWith ", " <<< map show) cards
+          ThreeOfAKind cards -> "Three Of A Kind: " <> (joinWith ", " <<< map show) cards
+          TwoPair cards -> "Two Pair: " <> (joinWith ", " <<< map show) cards
+          OnePair cards -> "One Pair: " <> (joinWith ", " <<< map show) cards
+          HighCard cards -> "High Card: " <> (joinWith ", " <<< map show) cards
+          Unspecified -> "Unspecified"
 instance ordHandValue :: Ord HandValue where
     compare h1 h2 =
         case { h1:h1, h2:h2 } of
@@ -168,13 +181,8 @@ type Deck = Array Card
 type PlayerCards = Array Card 
 type CommunityCards = Array Card 
 
-chooseBest5 :: Hand -> Int -> Hand
-chooseBest5 cards chosenCount = cards
-chooseBest5 _ chosenCount = []
-    
-    
 
-flush :: Hand -> Maybe HandValue
+flush :: Hand -> HandValue
 flush hand =
     let flushColor = maybe Spades (\(Card face color) -> color) $ head hand
         isFlush = (all (\(Card _ cardColor) -> cardColor == flushColor) hand)
@@ -183,11 +191,11 @@ flush hand =
 
     in
     if not isFlush
-    then Nothing
+    then Unspecified
     else
-        Just $ Flush $ reverse $ sort hand
+        Flush $ reverse $ sort hand
 
-straight :: Hand -> Maybe HandValue
+straight :: Hand -> HandValue
 straight hand =
     let sortedHand = sort hand
     in
@@ -205,34 +213,14 @@ straight hand =
                         {isStraight:(isStraight && (succ lastFace == Just face || aceToFive)), lastFace:face} ) { isStraight:true, lastFace:((\(Card face _ ) -> firstFace) head)} tail
             in
             if result.isStraight && length sortedHand == 5
-            then Just $ Straight $ reverse sortedHand
-            else Nothing
-        Nothing -> Nothing
-
-evaluate :: Hand -> Maybe HandValue
-evaluate hand = 
-    let ms = straight hand
-        mf = flush hand
-        mp = pairsTripsQuads hand
-    in
-    if isJust ms && isJust mf
-    then Just $ StraightFlush $ reverse $ sort hand
-    else
-        fromMaybe
-        (Just $ StraightFlush hand)
-        (maximumBy (\ma mb -> 
-                    case ma of
-                        Just a ->
-                            case mb of
-                                Just b ->
-                                    a `compare` b
-                                Nothing -> GT
-                        Nothing -> LT) [ms, mf, mp]
-        )
+            then Straight $ reverse sortedHand
+            else Unspecified
+        Nothing -> Unspecified
 
 
 
-pairsTripsQuads :: Hand -> Maybe HandValue
+
+pairsTripsQuads :: Hand -> HandValue
 pairsTripsQuads hand = 
     let map1 =
             foldl
@@ -269,27 +257,59 @@ pairsTripsQuads hand =
         case r of
             { pairsOrTrips, cards } ->
                 case sort pairsOrTrips of
-                    [2] -> Just $ OnePair cards
-                    [3] -> Just $ ThreeOfAKind cards
-                    [2, 2] -> Just $ TwoPair cards
-                    [2, 3] -> Just $ FullHouse cards
-                    [4] -> Just $ FourOfAKind cards
-                    _ -> Just $ HighCard cards
+                    [2] -> OnePair cards
+                    [3] -> ThreeOfAKind cards
+                    [2, 2] -> TwoPair cards
+                    [2, 3] -> FullHouse cards
+                    [4] -> FourOfAKind cards
+                    _ -> HighCard cards
     
 
 
+evaluate :: Hand -> HandValue
+evaluate hand = 
+    let s = straight hand
+        f = flush hand
+        p = pairsTripsQuads hand
+    in
+    if s /= Unspecified && f /= Unspecified
+    then StraightFlush $ reverse $ sort hand
+    else
+        fromMaybe Unspecified $ maximum [s, f, p]
+
 --main :: forall e. Eff (random :: RANDOM, console :: CONSOLE | e) Unit
 main = do
-    h <- (deal [3, 2, 2])
-    let x = map evaluate (tail h)
-    traceAnyA x
+    deal <- (deal [5, 2, 2])
+    case uncons deal.hands of
+        Just hands -> do
+            let x = map (evaluate <<< ((<>) hands.head)) hands.tail
+            log $ "Community: " <> show hands.head
+            foldM (\state x -> do
+                log $ show x
+                log $ show $ bestHand (x <> hands.head)
+                pure state) unit hands.tail
+        Nothing -> log "hallo"
+
+    
+getOuts :: Deck -> CommunityCards -> Hand -> Hand -> Array Card
+getOuts deck communityCards hero villain = 
+    filter
+    (\card -> 
+        let newCommunityCards = card:communityCards
+            newHeroValue = bestHand $ hero <> newCommunityCards
+            newVillainValue = bestHand $ villain <> newCommunityCards
+        in
+            newHeroValue >= newVillainValue
+    ) deck
 
 
 
 fullDeck = do
-    a <- enumFromTo Two Four
+    a <- enumFromTo Two Ace
     b <- [Spades, Clubs, Diamonds, Hearts]
     pure $ Card a b
+
+deal = dealHands fullDeck
 
 dealCard :: forall e. Deck -> Eff (random :: RANDOM | e) {deck::Deck, card::Card}
 dealCard deck = do
@@ -306,60 +326,41 @@ dealHand deck cardCount =
         pure {hand:(deal.card:state.hand), deck:deal.deck}
         ) {hand:[], deck:deck} (1 .. cardCount)
 
+dealHands :: forall e. Deck -> Array Int -> Eff (random :: RANDOM | e) { hands:: Array Hand, deck::Deck }
 dealHands deck cardCountArr =
     foldM (\state cardCount -> do
         deal <- dealHand state.deck cardCount
         pure {hands:(snoc state.hands deal.hand), deck:deal.deck}
-        ) {hands:[[]], deck:deck} cardCountArr
+        ) {hands:[], deck:deck} cardCountArr
 
-deal = dealHands fullDeck
     
 
-choose :: Hand -> Hand -> Int -> Array Hand
-choose _ chosen 0 = [chosen]
-choose [] chosen _ = [[]]
-choose chooseFrom chosen n = 
-    case uncons chooseFrom of
-    Nothing -> [[]]
-    Just cf ->
-        let s = (choose cf.tail (cf.head:chosen) (n-1))
-        in
-            if n <= length cf.tail
-            then (choose cf.tail chosen n) <> s
-            else s
+chooseCards :: Hand -> Int -> Array Hand
+chooseCards chooseFrom chooseCount =
+    let choose chooseFrom chosen chooseCount = 
+            if chooseCount == 0
+            then [chosen]
+            else if chooseFrom == []
+            then [[]]
+            else
+                case uncons chooseFrom of
+                Nothing -> [[]]
+                Just cf ->
+                    let s = (choose cf.tail (cf.head:chosen) (chooseCount-1))
+                    in
+                        if chooseCount <= length cf.tail
+                        then (choose cf.tail chosen chooseCount) <> s
+                        else s
+    in
+    choose chooseFrom [] chooseCount
 
 
 bestHand hand = 
-    let allHands = choose hand [] 5
+    let allHands = chooseCards hand 5
         handValues = map evaluate allHands
     in
-    fromMaybe
-    (Just $ StraightFlush hand)
-    (maximumBy (\ma mb -> 
-                case ma of
-                    Just a ->
-                        case mb of
-                            Just b ->
-                                a `compare` b
-                            Nothing -> GT
-                    Nothing -> LT) handValues
-    )
+    fromMaybe (StraightFlush []) $  maximum handValues
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
