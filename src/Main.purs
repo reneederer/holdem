@@ -1,7 +1,9 @@
-module Main  where
+module Main where
+
 
 import Prelude
 import Data.Enum
+import Data.Filterable
 import Data.Array
 import Data.String (drop, joinWith)
 import Data.Tuple
@@ -10,11 +12,103 @@ import Data.Foldable
 import Debug.Trace
 import Data.Traversable
 import Data.Generic
-import Data.Maybe
 import Data.Functor
+import Data.Nullable
+
+
+import Control.Alt ((<|>))
+import Control.Apply ((*>))
+import Control.Parallel.Class (parallel, runParallel)
+import Control.Monad.Aff (Aff, runAff, makeAff, launchAff, later, later', forkAff, forkAll, Canceler(..), cancel, attempt, finally, apathize)
+import Control.Monad.Aff.AVar (AVAR, makeVar, makeVar', putVar, modifyVar, takeVar, killVar)
+import Control.Monad.Aff.Console (CONSOLE, log)
+import Control.Monad.Cont.Class (callCC)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Free.Trans (liftFreeT, runFreeT)
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Free (liftFI, liftF)
+import Control.Monad.Aff (liftEff')
+import Control.Monad.Eff.Console (log) as Eff
+import Control.Monad.Eff.Exception (EXCEPTION, throwException, error, message, try)
+import Control.Monad.Error.Class (throwError)
+import Control.Monad.Rec.Class (tailRecM)
+import Data.Either (Either(..), either, fromLeft, fromRight)
+import Data.Unfoldable (replicate)
+import Partial.Unsafe (unsafePartial)
 import Control.Monad.Eff.Random
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Halogen.Query (liftH, fromEff)
+
+import Data.Functor.Coproduct (Coproduct)
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
+
+import Halogen as H
+import Halogen.HTML.Events.Indexed as HE
+import Halogen.HTML.Indexed as HH
+import Halogen.HTML.Properties.Indexed as HP
+import Halogen.Util (runHalogenAff, awaitBody)
+
+type State = { hands::Array Hand, communityCards::Array Card }
+
+initialState :: State
+initialState =
+    { hands: [], communityCards: [] }
+            
+
+data Query a =
+      NewCards a
+
+ui :: forall eff. H.Component State Query (Aff (random :: RANDOM | eff))
+ui =
+    H.component { render, eval }
+    where
+
+    render :: State -> H.ComponentHTML Query
+    render state =
+        HH.div_
+            ( [ HH.div_
+                [ HH.text $ "Community Cards: " <> show state.communityCards ]
+            ] <> 
+            (mapWithIndex
+                (\i hand ->
+                    HH.div_
+                        [ HH.text $ "Player " <> show (i + 1) <> ": " <> show hand
+                        , HH.br_
+                        , HH.text $ show $ bestHand $ state.communityCards <> hand]
+
+                ) state.hands
+            )
+            <>
+            [ HH.div_
+                [ HH.button
+                    [ HE.onClick (HE.input_ NewCards) ]
+                    [ HH.text "Off" ]
+                ]
+            ])
+
+    eval :: Query ~> H.ComponentDSL State Query (Aff (random :: RANDOM | eff))
+    eval (NewCards next) = do
+        communityCardCount <- H.fromEff $ randomInt 3 4
+        deal <- H.fromEff $ dealHands fullDeck [communityCardCount, 2, 2]
+        H.modify (\state ->
+            case uncons deal.hands of
+            Just d -> 
+                state { hands=d.tail, communityCards=d.head }
+            Nothing ->
+                state
+        )
+        pure next
+
+--dealHands :: forall e. Deck -> Array Int -> Eff (random :: RANDOM | e) { hands:: Array Hand, deck::Deck }
+main :: forall eff. Eff (H.HalogenEffects (random :: RANDOM | eff) ) Unit
+main = runHalogenAff do
+    body <- awaitBody
+    H.runUI ui initialState body
+
+
+
+
+
+
 
 data Color = 
       Diamonds
@@ -26,7 +120,6 @@ instance eqColor :: Eq Color where
     eq = gEq
 instance showColor :: Show Color where
     show x = drop 5 $ gShow x
-
 
 data Face = 
       Two
@@ -277,30 +370,43 @@ evaluate hand =
     else
         fromMaybe Unspecified $ maximum [s, f, p]
 
---main :: forall e. Eff (random :: RANDOM, console :: CONSOLE | e) Unit
-main = do
-    deal <- (deal [5, 2, 2])
-    case uncons deal.hands of
-        Just hands -> do
-            let x = map (evaluate <<< ((<>) hands.head)) hands.tail
-            log $ "Community: " <> show hands.head
-            foldM (\state x -> do
-                log $ show x
-                log $ show $ bestHand (x <> hands.head)
-                pure state) unit hands.tail
-        Nothing -> log "hallo"
+--main :: Eff (dom :: DOM.DOM) Unit
+--main = void do
+--  let component = T.createClass taskList initialTaskListState
+--  document <- DOM.window >>= DOM.document
+--  container <- unsafePartial (fromJust <<< toMaybe <$> DOM.querySelector "#container" (DOM.htmlDocumentToParentNode document))
+--  RDOM.render (R.createFactory component {}) container
+    --log "hallo welt"
+--    deal <- (deal [5, 2, 2])
+--    case uncons deal.hands of
+--        Just hands -> do
+--            let x = map (evaluate <<< ((<>) hands.head)) hands.tail
+--            log $ "Community: " <> show hands.head
+--            foldM (\state x -> do
+--                log $ show x
+--                log $ show $ bestHand (x <> hands.head)
+--                pure state) unit hands.tail
+--        Nothing -> log "hallo"
 
     
 getOuts :: Deck -> CommunityCards -> Hand -> Hand -> Array Card
 getOuts deck communityCards hero villain = 
-    filter
-    (\card -> 
-        let newCommunityCards = card:communityCards
-            newHeroValue = bestHand $ hero <> newCommunityCards
-            newVillainValue = bestHand $ villain <> newCommunityCards
-        in
-            newHeroValue >= newVillainValue
-    ) deck
+    let cardsAndValues =
+            filterMap
+            (\card -> 
+                let newCommunityCards = card:communityCards
+                    newHeroValue = bestHand $ hero <> newCommunityCards
+                    newVillainValue = bestHand $ villain <> newCommunityCards
+                in
+                    if newHeroValue <= newVillainValue
+                    then Nothing
+                    else Just {card:card, value:newHeroValue}
+            ) deck
+    in
+    (map (\cardAndValue -> cardAndValue.card)
+    <<<
+    sortBy (\cardAndValue1 cardAndValue2 -> cardAndValue2.value `compare` cardAndValue1.value))
+    cardsAndValues
 
 
 
@@ -308,8 +414,6 @@ fullDeck = do
     a <- enumFromTo Two Ace
     b <- [Spades, Clubs, Diamonds, Hearts]
     pure $ Card a b
-
-deal = dealHands fullDeck
 
 dealCard :: forall e. Deck -> Eff (random :: RANDOM | e) {deck::Deck, card::Card}
 dealCard deck = do
