@@ -1,12 +1,12 @@
 module Deal where
 
-import Types (Deck, Hand, Card(..), Color(..), Face(..))
-import Prelude (pure, bind, ($), (-))
+import Prelude (map, pure, bind, ($), (-), (<>))
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Random (RANDOM, randomInt)
-import Data.Array (snoc, foldM, deleteAt, length, (..), (:), (!!))
-import Data.Maybe (fromMaybe)
+import Data.Array ( uncons, snoc, foldM, deleteAt, length, (..), (:), (!!))
+import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Enum (enumFromTo)
+import Types (Deck, Hand, Card(..), Color(..), Face(..))
 
 fullDeck :: Array Card
 fullDeck = do
@@ -29,14 +29,22 @@ dealHand deck cardCount =
         pure {hand:(deal.card:state.hand), deck:deal.deck}
         ) {hand:[], deck:deck} (1 .. cardCount)
 
-dealHands :: forall e. Deck -> Array Int -> Eff (random :: RANDOM | e) { hands:: Array Hand, deck::Deck }
-dealHands deck cardCountArr =
+dealHandsFromDeck :: forall e. Deck -> Array Int -> Eff (random :: RANDOM | e) { hands:: Array Hand, deck::Deck }
+dealHandsFromDeck deck cardCountArr =
     foldM (\state cardCount -> do
         deal <- dealHand state.deck cardCount
         pure {hands:(snoc state.hands deal.hand), deck:deal.deck}
         ) {hands:[], deck:deck} cardCountArr
 
 
+dealHands :: forall e. Int -> Int -> Eff (random :: RANDOM | e) { hands::Array Hand, communityCards :: Array Card }
+dealHands communityCardCount playerCount = do
+    deal <- dealHandsFromDeck fullDeck $ [communityCardCount] <> (map (\_ -> 2) (1 .. playerCount))
+    case uncons deal.hands of
+        Just d -> 
+            pure { hands:d.tail, communityCards:d.head }
+        Nothing ->
+            pure { hands:[], communityCards:[] }
 
 
 

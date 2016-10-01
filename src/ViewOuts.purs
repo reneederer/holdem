@@ -2,21 +2,19 @@ module ViewOuts where
 
 import Prelude (type (~>), pure, bind, show, map, (<>), ($), (+))
 import Data.Array (uncons, mapWithIndex, concat, (\\), (..), (:))
-import Data.String (toLower)
 import Control.Alt ((<|>))
 import Control.Apply ((*>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
-import Data.Functor (class Functor)
 import Control.Monad.Eff.Random (RANDOM, randomInt)
 import Data.Maybe (Maybe(Nothing, Just))
 import Halogen as H
 import Halogen.HTML.Events.Indexed as HE
 import Halogen.HTML.Indexed as HH
-import Halogen.HTML.Properties.Indexed as PI
-import Types (Hand, Card(..))
-import Evaluate (bestHand, getOuts, getAllOuts)
+import Types (Hand, Card)
+import Evaluate (bestHand, getAllOuts)
 import Deal (fullDeck, dealHands)
+import ViewHelperFunctions
 
 
 type State =
@@ -25,7 +23,7 @@ type State =
 
 initialState :: forall e. Eff (random :: RANDOM | e) State
 initialState =
-    randomCards 3 2
+    dealHands 3 2
 
 data Query a =
       NewCards a
@@ -52,7 +50,6 @@ ui =
                             case uncons state.hands of
                                 Just hands -> hands
                                 Nothing -> {head: [], tail: [] }
-                        --outs = getOuts deck state.communityCards heroAndVillains.head heroAndVillains.tail
                         outsPerPlayer = getAllOuts deck state.communityCards (heroAndVillains.head:heroAndVillains.tail)
                     in
                     HH.div_ $
@@ -86,39 +83,11 @@ ui =
     eval (NewCards next) = do
         communityCardCount <- H.fromEff $ randomInt 3 4
         playerCardCount <- H.fromEff $ randomInt 2 3
-        deal <- H.fromEff $ randomCards communityCardCount playerCardCount
+        deal <- H.fromEff $ dealHands communityCardCount playerCardCount
         H.modify (\state -> deal)
         pure next
 
-handToImgs ::  forall a b c. (Functor a) => a Card -> a (HH.HTML b c)
-handToImgs hand =
-    map cardToImg hand
 
-cardToImg :: forall a b. Card -> HH.HTML a b
-cardToImg card = 
-    HH.img
-        [ PI.src $ getImageFile card
-        , PI.alt $ getImageFile card
-        , PI.width $ PI.Pixels 80 ]
-
-
-getImageFile :: Card -> String
-getImageFile (Card face color) = 
-    let faceStr = (toLower $ show face)
-        colorStr = (toLower $ show color)
-    in
-    "imgs/" <> faceStr <> "_of_" <> colorStr <> ".svg"
-
-randomCards :: forall e. Int -> Int -> Eff (random :: RANDOM | e) { hands::Array Hand, communityCards :: Array Card }
-randomCards communityCardCount playerCount = do
-    deal <- dealHands fullDeck $ [communityCardCount] <> (map (\_ -> 2) (1 .. playerCount))
-    let newCards =
-            case uncons deal.hands of
-                Just d -> 
-                    { hands:d.tail, communityCards:d.head }
-                Nothing ->
-                    { hands:[], communityCards:[] }
-    pure newCards
 
 
 
