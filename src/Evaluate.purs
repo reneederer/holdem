@@ -10,7 +10,7 @@ import Data.Traversable (maximum, maximumBy, foldl, all)
 import Control.Alt ((<|>))
 import Control.Apply ((*>))
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Types (Hand, CommunityCards, Deck, Card(..), Color(..), Face(..), HandValue(..))
+import Types (Deal, Hand, CommunityCards, Deck, Card(..), Color(..), Face(..), HandValue(..))
 import Data.Enum (succ)
 
 flush :: Hand -> HandValue
@@ -172,30 +172,26 @@ getOuts deck communityCards heroHand villainHands =
 
 
 
-getAllOuts :: Deck -> CommunityCards -> Array Hand -> Array (Array { card::Card, value::HandValue})
-getAllOuts deck communityCards hands = 
+getAllOuts :: Deck -> Deal -> Array (Array { card::Card, value::HandValue})
+getAllOuts deck deal = 
     let cardsAndValues =
             foldl
             (\state card -> 
-                let newCommunityCards = card:communityCards
+                let newCommunityCards = card:deal.communityCards
                     handValues =
                         mapWithIndex
                         (\i hand -> 
                             { index: i, card: card, value: bestHand $ hand <> newCommunityCards }
                         )
-                        hands
+                        deal.hands
                     maxHandValue = fromMaybe { index: 14, card:card, value:HighCard [] } $ maximumBy (\x y -> x.value `compare` y.value) handValues
                 in
                     fromMaybe state $ modifyAt maxHandValue.index (\x -> { card: maxHandValue.card,  value: maxHandValue.value}:x) state
             )
-            (map (\_ -> []) hands)
+            (map (\_ -> []) deal.hands)
             deck
     in
     cardsAndValues
-    --(map (\cardAndValue -> cardAndValue.card)
-    -- <<<
-    --sortBy (\cardAndValue1 cardAndValue2 -> cardAndValue2.value `compare` cardAndValue1.value))
-    --cardsAndValues
 
 
 

@@ -1,11 +1,11 @@
 <!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:foo="http://www.w3.org/2000/svg">
   <head>
-    <title>Halogen Example - Multi-component</title>
+    <title>Poker - Texas Hold 'em</title>
     <style>
       body {
         font-family: sans-serif;
-        max-width: 800px;
+        width: 100%;
         margin: auto;
       }
     </style>

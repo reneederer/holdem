@@ -6,16 +6,16 @@ import Halogen.HTML.Properties.Indexed as PI
 import Data.String (toLower)
 import Types (Card(..))
 
-handToImgs ::  forall a b c. (Functor a) => a Card -> a (HH.HTML b c)
-handToImgs hand =
-    map cardToImg hand
+handToImgs ::  forall a b c. (Functor a) => Int -> a Card -> a (HH.HTML b c)
+handToImgs width hand =
+    map (cardToImg width) hand
 
-cardToImg :: forall a b. Card -> HH.HTML a b
-cardToImg card = 
+cardToImg :: forall a b. Int -> Card -> HH.HTML a b
+cardToImg width card = 
     HH.img
         [ PI.src $ getImageFile card
         , PI.alt $ getImageFile card
-        , PI.width $ PI.Pixels 80 ]
+        , PI.width $ PI.Pixels width ]
 
 
 getImageFile :: Card -> String
@@ -24,3 +24,6 @@ getImageFile (Card face color) =
         colorStr = (toLower $ show color)
     in
     "imgs/" <> faceStr <> "_of_" <> colorStr <> ".svg"
+
+
+

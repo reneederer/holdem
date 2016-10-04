@@ -6,7 +6,7 @@ import Control.Monad.Eff.Random (RANDOM, randomInt)
 import Data.Array ( uncons, snoc, foldM, deleteAt, length, (..), (:), (!!))
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Enum (enumFromTo)
-import Types (Deck, Hand, Card(..), Color(..), Face(..))
+import Types (Deal, Deck, Hand, Card(..), Color(..), Face(..))
 
 fullDeck :: Array Card
 fullDeck = do
@@ -37,14 +37,15 @@ dealHandsFromDeck deck cardCountArr =
         ) {hands:[], deck:deck} cardCountArr
 
 
-dealHands :: forall e. Int -> Int -> Eff (random :: RANDOM | e) { hands::Array Hand, communityCards :: Array Card }
+dealHands :: forall e. Int -> Int -> Eff (random :: RANDOM | e) Deal
 dealHands communityCardCount playerCount = do
     deal <- dealHandsFromDeck fullDeck $ [communityCardCount] <> (map (\_ -> 2) (1 .. playerCount))
     case uncons deal.hands of
         Just d -> 
-            pure { hands:d.tail, communityCards:d.head }
+            pure $ { communityCards:d.head, hands: d.tail }
         Nothing ->
-            pure { hands:[], communityCards:[] }
+            pure $ { communityCards: [], hands: [] }
+
 
 
 

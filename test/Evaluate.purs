@@ -14,8 +14,7 @@ import Types (Card(..), Color(..), Face(..), HandValue(..))
 import Evaluate
 
 
-main :: forall e. Eff (console :: CONSOLE, testOutput :: TESTOUTPUT, avar :: AVAR | e) Unit                      
-main = runTest do
+testSuite =
     suite "Find all Outs" do
         test "Find outs to a higher straight flush" do
             let communityCards = 
@@ -205,7 +204,7 @@ main = runTest do
                 , Card Ten Hearts
                 ] $ 
                 getOuts deck communityCards heroCards [villainCards]
-    suite "Find best hand out of 7 cards" do
+    --suite "Find best hand out of 7 cards" do
         test "RoyalFlush" do
             Assert.equal
                 (StraightFlush
@@ -244,7 +243,7 @@ main = runTest do
                     , Card Queen Spades
                     , Card Six Clubs
                     ]
-    suite "Recognize 5 cards" do
+    --suite "Recognize 5 cards" do
         test "A Straight cannot go round, it is a HighCard" do
             Assert.equal
                 (HighCard
@@ -432,6 +431,5 @@ main = runTest do
                     , Card Queen Diamonds
                     , Card Ten Diamonds
                     ]
-
 
 

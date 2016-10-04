@@ -194,13 +194,59 @@ type Deck = Array Card
 type PlayerCards = Array Card 
 type CommunityCards = Array Card 
 
+type Deal =
+    { communityCards::CommunityCards
+    , hands::Array Hand
+    }
 
 
+data Query a =
+      CreateRandomPuzzle a
+    | CreateOutsPuzzle a
+    | CreatePotOddsPuzzle a
+    | CreateConvertNumberPuzzle a
+    | CreateHandProbabilityPuzzle a
+    | ShowSolution a
 
 
+class ShowSolutionClass a where
+    showSolution :: a -> a
 
+type PotOddsState = 
+    { pot:: Int
+    , bet:: Int
+    , deal:: Deal
+    , showSolution::Boolean
+    }
 
+type OutsState =
+    { deal::Deal
+    , showSolution::Boolean
+    }
 
+type ConvertNumberState =
+    { number::ConvertNumber
+    , showSolution::Boolean
+    }
+
+data ConvertNumber = 
+      Fraction Int Int
+    | Ratio Int Int
+    | Percentage Number
+derive instance genericConvertNumber :: Generic ConvertNumber
+instance showConvertNumber :: Show ConvertNumber where
+    show convertNumber =
+        case convertNumber of
+            Fraction numerator denominator -> show numerator <> " / " <> show denominator
+            Ratio numerator denominator -> show numerator <> " : " <> show denominator
+            Percentage percent -> show percent <> " %"
+instance eqConvertNumber :: Eq ConvertNumber where
+    eq = gEq
+
+type HandProbabilityState = 
+    { deal :: Deal
+    , showSolution::Boolean
+    }
 
 
 
